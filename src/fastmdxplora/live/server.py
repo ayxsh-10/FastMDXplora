@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from fastmdxplora.live.config_form import handle_run_request, render_config_form, run_active
 from fastmdxplora.live.protein_preview import find_structure, protein_preview_payload
 from fastmdxplora.live.telemetry import analyze_health, read_events, read_metrics, read_status
 
@@ -160,6 +161,9 @@ def make_handler(project_root: str | Path) -> type[BaseHTTPRequestHandler]:
                 regenerate = parsed.query == "regenerate=1"
                 self._send_json(protein_preview_payload(root, regenerate=regenerate))
                 return
+            if path == "/api/run":
+                self._send_json({"active": run_active(root)})
+                return
             if path == "/structure/topology.pdb":
                 self._send_structure(root)
                 return
@@ -171,12 +175,29 @@ def make_handler(project_root: str | Path) -> type[BaseHTTPRequestHandler]:
                 return
             self.send_error(404, "Not found")
 
+        def do_POST(self) -> None:  # noqa: N802 - stdlib API
+            parsed = urlparse(self.path)
+            if parsed.path == "/api/run":
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                    raw = self.rfile.read(length) if length else b"{}"
+                    payload = json.loads(raw or b"{}")
+                    if not isinstance(payload, dict):
+                        raise ValueError("payload must be a JSON object")
+                except (ValueError, json.JSONDecodeError) as exc:
+                    self._send_json({"error": f"Invalid request: {exc}"}, status=400)
+                    return
+                status, body = handle_run_request(root, payload)
+                self._send_json(body, status=status)
+                return
+            self.send_error(404, "Not found")
+
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
             return
 
-        def _send_json(self, payload: dict[str, Any]) -> None:
+        def _send_json(self, payload: dict[str, Any], status: int = 200) -> None:
             body = json.dumps(payload, default=str).encode("utf-8")
-            self.send_response(200)
+            self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(body)))
@@ -526,6 +547,7 @@ def _iso_now() -> str:
 
 def _dashboard_shell(root: Path) -> str:
     output_label = root.as_posix()
+    config_form_html = render_config_form()
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -699,6 +721,49 @@ def _dashboard_shell(root: Path) -> str:
     .table-row {{ display:grid; grid-template-columns:minmax(130px,.35fr) minmax(0,1fr); gap:12px; padding:9px 0; border-bottom:1px solid rgba(148,163,184,.12); }}
     .category-heading {{ margin:18px 0 10px; color:var(--muted); font-size:.82rem; text-transform:uppercase; letter-spacing:.06em; }}
     .quick-links {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }}
+    .config-form {{ display:grid; gap:16px; max-width:1100px; }}
+    .form-section {{ border:1px solid var(--line); border-radius:14px; background:var(--panel); box-shadow:0 1px 2px var(--shadow); padding:18px 18px 20px; }}
+    .form-section-head {{ margin-bottom:14px; }}
+    .form-section-head h2 {{ margin:0 0 2px; font-size:1rem; }}
+    .form-section-head p {{ margin:0; font-size:.84rem; }}
+    .form-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px 18px; }}
+    .field {{ display:grid; gap:7px; align-content:start; min-width:0; }}
+    .field-wide {{ grid-column:1/-1; }}
+    .field > label {{ font-size:.82rem; font-weight:600; color:var(--text); }}
+    .field-help {{ font-size:.74rem; color:var(--faint); }}
+    .field input[type=text], .field input[type=number], .field select {{
+      font:inherit; color:var(--text); background:var(--panel-frame); border:1px solid var(--line);
+      border-radius:9px; padding:9px 11px; width:100%; min-width:0;
+    }}
+    .field input[type=number] {{ font-family:var(--mono); }}
+    .field input:focus, .field select:focus {{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--pill-bg); }}
+    .input-row {{ display:flex; align-items:center; gap:8px; }}
+    .input-row .unit {{ color:var(--faint); font-size:.8rem; white-space:nowrap; }}
+    .range-row {{ display:flex; align-items:center; gap:12px; }}
+    .range {{ -webkit-appearance:none; appearance:none; height:6px; border-radius:99px; background:var(--line); flex:1 1 auto; }}
+    .range::-webkit-slider-thumb {{ -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid #fff; box-shadow:0 1px 3px var(--shadow); cursor:pointer; }}
+    .range::-moz-range-thumb {{ width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid #fff; cursor:pointer; }}
+    .range-ph {{ background:linear-gradient(90deg,#e8663c,#e6b93c,#3fa653,#3f7bd6,#7b5cd6); }}
+    .range-out {{ font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:.86rem; min-width:64px; text-align:right; color:var(--text); }}
+    .range-scale {{ display:flex; justify-content:space-between; font-size:.68rem; color:var(--faint); margin-top:2px; }}
+    .toggle {{ display:inline-flex; align-items:center; cursor:pointer; }}
+    .toggle input {{ position:absolute; opacity:0; }}
+    .toggle .track {{ width:42px; height:24px; border-radius:99px; background:var(--line); position:relative; transition:background .18s ease; }}
+    .toggle .track::after {{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 2px var(--shadow); transition:transform .18s ease; }}
+    .toggle input:checked + .track {{ background:var(--accent); }}
+    .toggle input:checked + .track::after {{ transform:translateX(18px); }}
+    .chip-checks {{ display:flex; gap:8px; flex-wrap:wrap; }}
+    .chip-check {{ display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); border-radius:99px; padding:6px 12px; cursor:pointer; font-size:.84rem; background:var(--panel-frame); }}
+    .chip-check input {{ accent-color:var(--accent); }}
+    .form-actions {{ display:flex; gap:10px; justify-content:flex-end; align-items:center; }}
+    .button.primary {{ background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }}
+    .button.primary:hover {{ background:var(--accent-ink); border-color:var(--accent-ink); }}
+    .button.ghost {{ background:transparent; }}
+    .button:disabled {{ opacity:.5; cursor:not-allowed; }}
+    .run-result {{ border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:.86rem; }}
+    .run-result.ok {{ border-color:var(--pill-border); background:var(--pill-bg); }}
+    .run-result.bad {{ border-color:rgba(209,67,67,.4); background:rgba(209,67,67,.08); }}
+    .run-result pre {{ margin:8px 0 0; font-family:var(--mono); font-size:.78rem; white-space:pre-wrap; overflow-wrap:anywhere; }}
     @media (max-width: 1000px) {{
       .live-grid {{ grid-template-columns:1fr; }}
       .live-bottom-grid {{ grid-template-columns:1fr; }}
@@ -712,8 +777,17 @@ def _dashboard_shell(root: Path) -> str:
 <body>
 <div class="layout">
   <aside>
+<<<<<<< HEAD
+    <div class="brand-row">
+      <img class="brand-logo" alt="AAI Research Lab" src="{AAI_LOGO_DATA_URI}">
+      <div><div class="brand">FastMDXplora</div><div class="subtle" style="font-size:.72rem">Live dashboard</div></div>
+    </div>
+    <div class="nav-heading">Setup</div>
+    <a href="#configure" class="nav-link" data-view-link="configure">Configure &amp; Run</a>
+=======
     <div class="brand">FastMDXplora</div>
     <div class="subtle">Local live dashboard</div>
+>>>>>>> parent of c58e6b3 (Restyle live dashboard to match the report's Fastfold look)
     <div class="nav-heading">Overview</div>
     <a href="#dashboard" class="nav-link active" data-view-link="dashboard">Dashboard</a>
     <a href="#live" class="nav-link" data-view-link="live">Live Simulation</a>
@@ -723,6 +797,13 @@ def _dashboard_shell(root: Path) -> str:
     <a href="#run-status" class="nav-link" data-view-link="run-status">Run Status</a>
   </aside>
   <main>
+    <section id="configure" class="view">
+      <div class="header">
+        <div><h1>Configure &amp; Run</h1><div class="subtle">Set parameters mapped to FastMDXplora's config, save, and launch a run.</div></div>
+      </div>
+      <div class="panel result-state">Values map directly to the FastMDXplora YAML schema. Save writes <code>ui_run_config.yml</code>; Run launches <code>fastmdx explore</code> with live telemetry.</div>
+      {config_form_html}
+    </section>
     <section id="dashboard" class="view active">
       <div class="header">
         <div><h1>Dashboard</h1><div class="subtle">Completed results and generated files</div></div>
@@ -1303,6 +1384,58 @@ poll(); refreshResults(); refreshProteinPreview();
 setInterval(poll, 3000);
 setInterval(() => refreshResults().catch(() => {{}}), 5000);
 setInterval(() => refreshProteinPreview().catch(() => {{}}), 5000);
+
+// --- Configure tab: range displays + save/run ---
+(function initConfigForm() {{
+  const form = document.getElementById("config-form");
+  if (!form) return;
+  form.querySelectorAll(".range").forEach(range => {{
+    const out = form.querySelector('output[for="' + range.id + '"]');
+    const unit = out ? (out.textContent.replace(/[\\d.\\s-]/g, "") ) : "";
+    const sync = () => {{ if (out) out.textContent = range.value + (unit ? " " + unit : ""); }};
+    range.addEventListener("input", sync); sync();
+  }});
+  function collectConfig() {{
+    const payload = {{}};
+    form.querySelectorAll("[data-cfg-key]").forEach(el => {{
+      const key = el.dataset.cfgKey;
+      if (el.type === "checkbox") payload[key] = el.checked;
+      else payload[key] = el.value;
+    }});
+    const phases = [];
+    form.querySelectorAll("[data-cfg-group]").forEach(el => {{ if (el.checked) phases.push(el.value); }});
+    if (phases.length) payload.phases = phases;
+    return payload;
+  }}
+  const result = document.getElementById("run-result");
+  function showResult(kind, title, detail) {{
+    result.hidden = false;
+    result.className = "run-result " + kind;
+    result.innerHTML = "<strong>" + title + "</strong>" + (detail ? "<pre>" + detail + "</pre>" : "");
+  }}
+  async function submit(dryRun, button) {{
+    const payload = collectConfig();
+    payload.dry_run = dryRun;
+    const buttons = form.querySelectorAll(".form-actions .button");
+    buttons.forEach(b => b.disabled = true);
+    const original = button.textContent;
+    button.textContent = dryRun ? "Saving..." : "Launching...";
+    try {{
+      const res = await fetch("/api/run", {{
+        method: "POST", headers: {{"Content-Type": "application/json"}},
+        body: JSON.stringify(payload),
+      }});
+      const body = await res.json();
+      if (!res.ok) {{ showResult("bad", "Could not " + (dryRun ? "save" : "start") + ": " + (body.error || res.status)); }}
+      else if (body.status === "validated") {{ showResult("ok", "Config saved to " + body.config_path, JSON.stringify(body.config, null, 2)); }}
+      else if (body.status === "started") {{ showResult("ok", "Run started (pid " + body.pid + "). Watch the Live Simulation tab.", "config: " + body.config_path + "  •  log: " + body.log); showView("live"); }}
+      else {{ showResult("ok", "Done", JSON.stringify(body, null, 2)); }}
+    }} catch (err) {{ showResult("bad", "Request failed: " + err); }}
+    finally {{ buttons.forEach(b => b.disabled = false); button.textContent = original; }}
+  }}
+  document.getElementById("save-config").addEventListener("click", ev => submit(true, ev.currentTarget));
+  document.getElementById("run-simulation").addEventListener("click", ev => submit(false, ev.currentTarget));
+}})();
 </script>
 </body>
 </html>"""

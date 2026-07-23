@@ -10,6 +10,7 @@ These tests verify that after a real analysis run, the report phase:
 from __future__ import annotations
 
 import json
+import re
 import zipfile
 from pathlib import Path
 
@@ -373,9 +374,12 @@ class TestDashboard:
         assert "slides.pptx" in text
         assert "project_bundle.zip" in text
         assert "dashboard.html" in text
-        assert "TODO" not in text
-        assert "fake" not in text.lower()
-        assert "dummy" not in text.lower()
+        # Placeholder guard applies to visible content, not embedded binary
+        # assets (logo/fonts are base64 data URIs whose bytes may spell anything).
+        visible = re.sub(r'data:[^"\']+', "", text)
+        assert "TODO" not in visible
+        assert "fake" not in visible.lower()
+        assert "dummy" not in visible.lower()
         with zipfile.ZipFile(project_with_analysis / "report" / "project_bundle.zip") as zf:
             names = set(zf.namelist())
         assert "report/dashboard_assets/rmsd_dashboard.png" in names

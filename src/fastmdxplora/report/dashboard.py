@@ -12,6 +12,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
+from fastmdxplora.report._assets import (
+    AAI_LOGO_DATA_URI,
+    FONT_BODY_WOFF2,
+    FONT_DISPLAY_WOFF2,
+)
 from fastmdxplora.report.context import load_phase_context
 from fastmdxplora.utils.logging import get_logger
 
@@ -84,7 +89,7 @@ DASHBOARD_ASSET_SPECS: tuple[tuple[str, str, str, str, str, str, str], ...] = (
         "RMSD",
         "analysis/rmsd/rmsd.dat",
         "rmsd_dashboard.png",
-        "#35a7ff",
+        "#5a57d6",
         "Frame",
         "RMSD (nm)",
         "line",
@@ -93,7 +98,7 @@ DASHBOARD_ASSET_SPECS: tuple[tuple[str, str, str, str, str, str, str], ...] = (
         "RMSF",
         "analysis/rmsf/rmsf.dat",
         "rmsf_dashboard.png",
-        "#d957c8",
+        "#5a57d6",
         "Residue",
         "RMSF (nm)",
         "line",
@@ -102,7 +107,7 @@ DASHBOARD_ASSET_SPECS: tuple[tuple[str, str, str, str, str, str, str], ...] = (
         "Radius of gyration",
         "analysis/rg/rg.dat",
         "rg_dashboard.png",
-        "#57c45d",
+        "#5a57d6",
         "Frame",
         "Rg (nm)",
         "line",
@@ -111,7 +116,7 @@ DASHBOARD_ASSET_SPECS: tuple[tuple[str, str, str, str, str, str, str], ...] = (
         "Hydrogen bonds",
         "analysis/hbonds/hbonds.dat",
         "hbonds_dashboard.png",
-        "#2ed3e6",
+        "#5a57d6",
         "Frame",
         "H-bonds",
         "line",
@@ -120,7 +125,7 @@ DASHBOARD_ASSET_SPECS: tuple[tuple[str, str, str, str, str, str, str], ...] = (
         "Total SASA",
         "analysis/sasa/sasa.dat",
         "sasa_dashboard.png",
-        "#43c7b7",
+        "#5a57d6",
         "Frame",
         "SASA (nm^2)",
         "line",
@@ -228,7 +233,7 @@ DASHBOARD_ASSET_SPECS: tuple[tuple[str, str, str, str, str, str, str], ...] = (
         "Fraction of native contacts",
         "analysis/qvalue/qvalue.dat",
         "qvalue_dashboard.png",
-        "#57c45d",
+        "#5a57d6",
         "Frame",
         "Q",
         "line",
@@ -251,6 +256,7 @@ class DashboardCard:
     value: str
     detail: str = ""
     kind: str = "neutral"
+    title: str = ""  # full text for the tooltip when value is displayed compact
 
 
 @dataclass(frozen=True)
@@ -436,7 +442,12 @@ def _summary_cards(
         cards.append(DashboardCard("Wall time", wall_time, "recorded phase timestamps"))
 
     cards.append(
-        DashboardCard("Output folder", project_root.as_posix(), "project root")
+        DashboardCard(
+            "Output folder",
+            _compact_output_path(project_root.as_posix()),
+            "project root",
+            title=project_root.as_posix(),
+        )
     )
     return cards
 
@@ -653,6 +664,14 @@ def _build_dashboard_assets(
     return assets
 
 
+# Light-theme palette for re-rendered dashboard chart assets, matching the
+# dashboard page. The static report figures keep their own styling.
+CHART_FACE = "#ffffff"
+CHART_LINE = "#d5d9e0"
+CHART_TICK = "#5b6470"
+CHART_LABEL = "#374151"
+
+
 def _write_dashboard_chart(
     *,
     data_path: Path,
@@ -687,9 +706,9 @@ def _write_dashboard_chart(
             alpha=0.95,
         )
         cbar = fig.colorbar(points, ax=ax, pad=0.02, fraction=0.05)
-        cbar.ax.tick_params(colors="#a7b5c6", labelsize=7)
-        cbar.outline.set_edgecolor("#34506a")
-        cbar.set_label("Frame", color="#cbd7e6", fontsize=8)
+        cbar.ax.tick_params(colors=CHART_TICK, labelsize=7)
+        cbar.outline.set_edgecolor(CHART_LINE)
+        cbar.set_label("Frame", color=CHART_LABEL, fontsize=8)
         summary = f"{len(rows)} frames"
     elif kind == "cluster":
         rows = _numeric_rows(data_path)
@@ -739,9 +758,9 @@ def _write_dashboard_chart(
         ax.set_xlim(-180, 180)
         ax.set_ylim(-180, 180)
         cbar = fig.colorbar(points, ax=ax, pad=0.02, fraction=0.05)
-        cbar.ax.tick_params(colors="#a7b5c6", labelsize=7)
-        cbar.outline.set_edgecolor("#34506a")
-        cbar.set_label("Frame", color="#cbd7e6", fontsize=8)
+        cbar.ax.tick_params(colors=CHART_TICK, labelsize=7)
+        cbar.outline.set_edgecolor(CHART_LINE)
+        cbar.set_label("Frame", color=CHART_LABEL, fontsize=8)
         summary = f"{len(rows)} angles"
     elif kind == "ss":
         matrix, residues, frames = _secondary_structure_matrix(data_path)
@@ -827,16 +846,16 @@ def _plot_dashboard_dendrogram(
 
 
 def _style_dashboard_axes(fig, ax) -> None:
-    fig.patch.set_facecolor("#0f1a2a")
-    ax.set_facecolor("#0f1a2a")
+    fig.patch.set_facecolor(CHART_FACE)
+    ax.set_facecolor(CHART_FACE)
     for spine in ax.spines.values():
-        spine.set_color("#34506a")
-    ax.tick_params(colors="#a7b5c6", labelsize=8)
-    ax.xaxis.label.set_color("#cbd7e6")
-    ax.yaxis.label.set_color("#cbd7e6")
+        spine.set_color(CHART_LINE)
+    ax.tick_params(colors=CHART_TICK, labelsize=8)
+    ax.xaxis.label.set_color(CHART_LABEL)
+    ax.yaxis.label.set_color(CHART_LABEL)
     ax.xaxis.label.set_size(8)
     ax.yaxis.label.set_size(8)
-    ax.grid(True, color="#34506a", alpha=0.25, linewidth=0.7)
+    ax.grid(True, color=CHART_LINE, alpha=0.55, linewidth=0.7)
 
 
 def _finish_dashboard_chart(fig, ax, output_path: Path) -> None:
@@ -1222,33 +1241,95 @@ def _render_dashboard(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{escape(title)} - FastMDXplora Dashboard</title>
   <style>
+    @font-face {{
+      font-family: "Bricolage Grotesque";
+      font-style: normal;
+      font-weight: 200 800;
+      font-display: swap;
+      src: url("{FONT_DISPLAY_WOFF2}") format("woff2");
+    }}
+    @font-face {{
+      font-family: "Hanken Grotesk";
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("{FONT_BODY_WOFF2}") format("woff2");
+    }}
     :root {{
-      color-scheme: dark;
-      --bg: #07101b;
-      --sidebar: #071321;
-      --panel: #101a28;
-      --panel-2: #152437;
-      --panel-3: #0c1724;
-      --line: #22364b;
-      --text: #edf4fb;
-      --muted: #a7b5c6;
-      --accent: #39b7c9;
-      --accent-blue: #4d9df7;
-      --accent-2: #7cc66a;
-      --warn: #efb35e;
-      --danger: #e35d6a;
-      --shadow: rgba(0, 0, 0, 0.25);
+      color-scheme: light dark;
+      --bg: #f7f8fa;
+      --bg-glow: rgba(90, 87, 214, 0.05);
+      --sidebar: #ffffff;
+      --panel: #ffffff;
+      --panel-frame: #fbfbfd;
+      --line: #ececf1;
+      --line-soft: #f0f1f4;
+      --text: #1a1c22;
+      --muted: #6a6f7a;
+      --faint: #9aa0ab;
+      --accent: #5a57d6;
+      --accent-ink: #4a47c4;
+      --accent-blue: #5a57d6;
+      --accent-2: #2f9e64;
+      --warn: #bd8420;
+      --danger: #d14343;
+      --shadow: rgba(20, 22, 40, 0.06);
+      --shadow-md: rgba(20, 22, 40, 0.10);
+      --pill-bg: rgba(90, 87, 214, 0.10);
+      --pill-text: #4a47c4;
+      --pill-border: rgba(90, 87, 214, 0.22);
+      --chip-bg: #eceef1;
+      --chip-text: #4b5563;
+      --accent-tint: rgba(90, 87, 214, 0.06);
+      --nav-active-bg: rgba(90, 87, 214, 0.10);
+      --nav-active-text: #4a47c4;
+      --sans: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system,
+        "Segoe UI", sans-serif;
+      --display: "Bricolage Grotesque", "Hanken Grotesk", ui-sans-serif,
+        system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas,
+        "Liberation Mono", monospace;
+    }}
+    @media (prefers-color-scheme: dark) {{
+      :root {{
+        --bg: #0e0f13;
+        --bg-glow: rgba(140, 136, 245, 0.10);
+        --sidebar: #16181e;
+        --panel: #16181e;
+        --panel-frame: #12141a;
+        --line: #24262f;
+        --line-soft: #20222a;
+        --text: #eceef2;
+        --muted: #9ba1ad;
+        --faint: #6b7280;
+        --accent: #8c88f5;
+        --accent-ink: #a6a3ff;
+        --accent-blue: #8c88f5;
+        --accent-2: #46b87c;
+        --warn: #d8a23f;
+        --danger: #e06b6b;
+        --shadow: rgba(0, 0, 0, 0.40);
+        --shadow-md: rgba(0, 0, 0, 0.50);
+        --pill-bg: rgba(140, 136, 245, 0.15);
+        --pill-text: #a6a3ff;
+        --pill-border: rgba(140, 136, 245, 0.30);
+        --chip-bg: #2b2e38;
+        --chip-text: #cdd2db;
+        --accent-tint: rgba(140, 136, 245, 0.10);
+        --nav-active-bg: rgba(140, 136, 245, 0.14);
+        --nav-active-text: #a6a3ff;
+      }}
     }}
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
       background:
-        radial-gradient(circle at top left, rgba(57, 183, 201, 0.12), transparent 34rem),
-        linear-gradient(180deg, #07101b 0%, #0a1724 100%);
+        radial-gradient(circle at top left, var(--bg-glow), transparent 34rem),
+        var(--bg);
       color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-        "Segoe UI", sans-serif;
+      font-family: var(--sans);
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }}
     a {{ color: inherit; }}
     .layout {{
@@ -1262,7 +1343,7 @@ def _render_dashboard(
       height: 100vh;
       overflow-y: auto;
       border-right: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(7, 19, 33, 0.98), rgba(5, 13, 23, 0.98));
+      background: var(--sidebar);
       padding: 22px 16px;
     }}
     .logo {{
@@ -1275,19 +1356,18 @@ def _render_dashboard(
       margin-bottom: 20px;
     }}
     .mark {{
-      display: grid;
-      place-items: center;
       width: 42px;
       height: 42px;
-      border-radius: 12px;
-      border: 1px solid rgba(77, 157, 247, 0.5);
-      background: rgba(77, 157, 247, 0.12);
-      color: #7ed5ff;
-      font-weight: 800;
+      border-radius: 11px;
+      object-fit: cover;
+      display: block;
+      box-shadow: var(--shadow);
     }}
     .logo-title {{
-      font-size: 1.08rem;
-      font-weight: 800;
+      font-family: var(--display);
+      font-size: 1.02rem;
+      font-weight: 650;
+      letter-spacing: -0.01em;
       line-height: 1.1;
     }}
     .logo-subtitle {{
@@ -1297,9 +1377,9 @@ def _render_dashboard(
     }}
     .nav-section {{ margin: 18px 0; }}
     .nav-heading {{
-      color: #7d8da2;
-      font-size: 0.72rem;
-      font-weight: 800;
+      color: var(--faint);
+      font-size: 0.7rem;
+      font-weight: 700;
       letter-spacing: 0.07em;
       text-transform: uppercase;
       margin: 0 0 8px;
@@ -1311,22 +1391,22 @@ def _render_dashboard(
       min-height: 34px;
       padding: 7px 10px;
       border-radius: 8px;
-      color: #d4deea;
+      color: var(--text);
       text-decoration: none;
       font-size: 0.9rem;
     }}
     .nav-link.active {{
-      background: linear-gradient(90deg, rgba(77, 157, 247, 0.32), rgba(57, 183, 201, 0.14));
-      color: white;
+      background: var(--nav-active-bg);
+      color: var(--nav-active-text);
     }}
     .nav-link:hover, .output-link:hover, .action-link:hover {{
-      border-color: rgba(77, 157, 247, 0.6);
-      background-color: rgba(77, 157, 247, 0.08);
+      border-color: var(--pill-border);
+      background-color: var(--pill-bg);
     }}
     .nav-icon {{
       width: 1.35em;
       text-align: center;
-      color: var(--accent);
+      color: var(--faint);
     }}
     .shell {{
       width: min(1480px, calc(100% - 36px));
@@ -1347,17 +1427,20 @@ def _render_dashboard(
       margin-top: 5px;
     }}
     .brand {{
-      color: var(--accent);
-      font-size: 0.82rem;
-      font-weight: 700;
+      color: var(--faint);
+      font-size: 0.72rem;
+      font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }}
     h1 {{
       margin: 6px 0;
-      font-size: clamp(1.8rem, 3vw, 3.2rem);
-      line-height: 1.05;
-      letter-spacing: 0;
+      font-family: var(--display);
+      font-size: clamp(1.6rem, 2.4vw, 2rem);
+      font-weight: 650;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
     }}
     .subtle {{ color: var(--muted); }}
     .status {{
@@ -1367,7 +1450,7 @@ def _render_dashboard(
       padding: 8px 12px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: rgba(255, 255, 255, 0.04);
+      background: var(--panel-frame);
       color: var(--muted);
       white-space: nowrap;
     }}
@@ -1380,17 +1463,81 @@ def _render_dashboard(
     .dot.ok {{ background: var(--accent-2); }}
     .dot.error {{ background: var(--danger); }}
     .dot.unknown {{ background: var(--warn); }}
+    .header-controls {{
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }}
+    .mode-toggle {{
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }}
+    .mode-toggle-label {{
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--faint);
+    }}
+    .mode-segments {{
+      position: relative;
+      display: inline-flex;
+      padding: 3px;
+      background: var(--panel-frame);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+    }}
+    .mode-thumb {{
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: calc(50% - 3px);
+      height: calc(100% - 6px);
+      border-radius: 999px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 1px 2px var(--shadow);
+      transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    }}
+    .layout[data-mode="advanced"] .mode-thumb {{ transform: translateX(100%); }}
+    .mode-segment {{
+      position: relative;
+      z-index: 1;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      padding: 5px 16px;
+      border-radius: 999px;
+      transition: color 160ms ease;
+    }}
+    .mode-segment[aria-pressed="true"] {{ color: var(--text); }}
+    .mode-segment:focus-visible {{ outline: 2px solid var(--accent); outline-offset: 2px; }}
+    .layout[data-mode="basic"] .analysis-section:not(.section-core-metrics) {{ display: none; }}
+    .layout[data-mode="basic"] .nav-link.nav-advanced {{ display: none; }}
+    .layout[data-mode="basic"] .size-controls,
+    .layout[data-mode="basic"] .resize-handle,
+    .layout[data-mode="basic"] .reset-layout {{ display: none; }}
+    @media (prefers-reduced-motion: reduce) {{
+      .mode-thumb, .plot-card, .size-controls, .resize-handle {{ transition: none; }}
+    }}
     .notice {{
       margin: 20px 0 0;
       padding: 14px 16px;
-      border: 1px solid rgba(57, 183, 201, 0.38);
+      border: 1px solid var(--pill-border);
       border-radius: 8px;
-      background: rgba(57, 183, 201, 0.09);
-      color: #d9f8fc;
+      background: var(--accent-tint);
+      color: var(--text);
     }}
     .notice strong {{
       display: block;
-      color: white;
+      color: var(--text);
       margin-bottom: 3px;
     }}
     .live-panel {{
@@ -1410,9 +1557,9 @@ def _render_dashboard(
       margin-top: 12px;
     }}
     .live-mini-card {{
-      border: 1px solid rgba(148, 163, 184, 0.16);
+      border: 1px solid var(--line);
       border-radius: 8px;
-      background: #0b1626;
+      background: var(--panel-frame);
       padding: 10px;
     }}
     .live-mini-card span {{
@@ -1432,26 +1579,32 @@ def _render_dashboard(
     }}
     .card, .plot-card, .output-link, .empty-state, .panel-block, .action-link {{
       border: 1px solid var(--line);
-      border-radius: 8px;
-      background: linear-gradient(180deg, rgba(19, 35, 56, 0.92), rgba(16, 27, 41, 0.96));
-      box-shadow: 0 16px 42px var(--shadow);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: 0 1px 2px var(--shadow);
     }}
     .card {{
       min-height: 124px;
       padding: 18px;
     }}
     .card .label {{
-      color: var(--muted);
-      font-size: 0.88rem;
+      color: var(--faint);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
       margin-bottom: 10px;
     }}
     .card .value {{
-      font-size: 1.55rem;
-      font-weight: 760;
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 1.4rem;
+      font-weight: 550;
       overflow-wrap: anywhere;
     }}
     .card.good .value {{ color: var(--accent-2); }}
     .card.warn .value {{ color: var(--warn); }}
+    .card.card-path .value {{ font-size: 0.86rem; font-weight: 500; line-height: 1.45; }}
     .card .detail {{
       color: var(--muted);
       font-size: 0.86rem;
@@ -1459,8 +1612,8 @@ def _render_dashboard(
       overflow-wrap: anywhere;
     }}
     .status-card {{
-      border-color: rgba(57, 183, 201, 0.35);
-      background: linear-gradient(180deg, rgba(57, 183, 201, 0.11), rgba(16, 27, 41, 0.96));
+      border-color: var(--pill-border);
+      background: var(--accent-tint);
     }}
     .section-heading {{
       display: flex;
@@ -1471,8 +1624,10 @@ def _render_dashboard(
     }}
     h2 {{
       margin: 0;
-      font-size: 1.08rem;
-      letter-spacing: 0;
+      font-family: var(--display);
+      font-size: 1.02rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
     }}
     .plot-grid {{
       display: grid;
@@ -1487,12 +1642,17 @@ def _render_dashboard(
       overflow: hidden;
       min-width: 0;
       min-height: 0;
-      padding: 14px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
       position: relative;
       grid-column: span var(--col-span, 1);
       grid-row: span var(--row-span, 20);
+      transition: transform 140ms ease, box-shadow 140ms ease;
+    }}
+    .plot-card:hover {{
+      transform: translateY(-2px);
+      box-shadow: 0 6px 22px var(--shadow-md);
     }}
     .plot-card.card-sm {{ --col-span: 1; --row-span: 16; }}
     .plot-card.card-md {{ --col-span: 1; --row-span: 20; }}
@@ -1507,7 +1667,8 @@ def _render_dashboard(
     }}
     .plot-header h3 {{
       margin: 0;
-      font-size: 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
     }}
     .plot-title-group {{
       min-width: 0;
@@ -1518,10 +1679,14 @@ def _render_dashboard(
       align-items: center;
       flex-wrap: wrap;
       justify-content: flex-end;
+      opacity: 0;
+      transition: opacity 140ms ease;
     }}
+    .plot-card:hover .size-controls,
+    .plot-card:focus-within .size-controls {{ opacity: 1; }}
     .size-button, .reset-layout {{
-      border: 1px solid rgba(148, 163, 184, 0.28);
-      background: rgba(15, 26, 42, 0.88);
+      border: 1px solid var(--line);
+      background: var(--chip-bg);
       color: var(--muted);
       border-radius: 6px;
       padding: 3px 6px;
@@ -1531,9 +1696,9 @@ def _render_dashboard(
       cursor: pointer;
     }}
     .size-button:hover, .size-button.active, .reset-layout:hover {{
-      color: white;
-      border-color: rgba(57, 183, 201, 0.72);
-      background: rgba(57, 183, 201, 0.18);
+      color: var(--accent);
+      border-color: var(--pill-border);
+      background: var(--pill-bg);
     }}
     .plot-frame {{
       flex: 1 1 auto;
@@ -1542,13 +1707,13 @@ def _render_dashboard(
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      background: #0b1626;
+      background: var(--panel-frame);
       border-radius: 12px;
       padding: 8px;
-      border: 1px solid rgba(148, 163, 184, 0.18);
+      border: 1px solid var(--line);
     }}
     .plot-card.fallback .plot-frame {{
-      background: #0b1626;
+      background: var(--panel-frame);
       padding: 12px;
     }}
     .plot-frame a {{
@@ -1568,7 +1733,7 @@ def _render_dashboard(
       height: 100%;
       object-fit: contain;
       border-radius: 6px;
-      background: #0f1a2a;
+      background: var(--panel-frame);
     }}
     .plot-card.fallback .plot-frame img {{
       background: white;
@@ -1580,9 +1745,11 @@ def _render_dashboard(
       width: 16px;
       height: 16px;
       cursor: nwse-resize;
-      opacity: 0.75;
+      opacity: 0;
+      transition: opacity 140ms ease;
       touch-action: none;
     }}
+    .plot-card:hover .resize-handle {{ opacity: 0.7; }}
     .resize-handle::before {{
       content: "";
       position: absolute;
@@ -1594,17 +1761,20 @@ def _render_dashboard(
     .tag {{
       display: inline-flex;
       align-items: center;
-      padding: 3px 7px;
+      padding: 3px 9px;
       border-radius: 999px;
-      border: 1px solid rgba(57, 183, 201, 0.32);
-      color: #b9ecf3;
-      background: rgba(57, 183, 201, 0.10);
+      border: 1px solid var(--pill-border);
+      color: var(--pill-text);
+      background: var(--pill-bg);
       font-size: 0.72rem;
+      font-weight: 600;
       white-space: nowrap;
     }}
     .summary-value {{
       color: var(--text);
-      font-size: 0.84rem;
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 0.82rem;
       margin-top: 9px;
     }}
     .source {{
@@ -1644,7 +1814,7 @@ def _render_dashboard(
       gap: 9px;
       align-items: center;
       padding: 9px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      border-bottom: 1px solid var(--line-soft);
     }}
     .phase-row:last-child {{ border-bottom: 0; }}
     .phase-dot {{
@@ -1653,15 +1823,15 @@ def _render_dashboard(
       width: 22px;
       height: 18px;
       border-radius: 99px;
-      background: #33465c;
-      color: white;
+      background: var(--chip-bg);
+      color: var(--chip-text);
       font-size: 0.58rem;
       font-weight: 800;
     }}
-    .phase-row.ok .phase-dot {{ background: var(--accent-2); }}
-    .phase-row.error .phase-dot {{ background: var(--danger); }}
-    .phase-row.skipped .phase-dot {{ background: var(--warn); }}
-    .phase-row.not-run .phase-dot {{ background: #536274; }}
+    .phase-row.ok .phase-dot {{ background: var(--accent-2); color: #fff; }}
+    .phase-row.error .phase-dot {{ background: var(--danger); color: #fff; }}
+    .phase-row.skipped .phase-dot {{ background: var(--warn); color: #fff; }}
+    .phase-row.not-run .phase-dot {{ background: #94a3b8; color: #fff; }}
     .phase-detail {{
       color: var(--muted);
       font-size: 0.84rem;
@@ -1673,7 +1843,7 @@ def _render_dashboard(
     }}
     th, td {{
       padding: 9px 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid var(--line-soft);
       text-align: left;
       vertical-align: top;
     }}
@@ -1714,7 +1884,7 @@ def _render_dashboard(
     }}
     .outputs-extra summary {{
       cursor: pointer;
-      color: #b9ecf3;
+      color: var(--accent);
       font-size: 0.84rem;
       margin-bottom: 10px;
     }}
@@ -1781,7 +1951,7 @@ def _render_dashboard(
   </style>
 </head>
 <body>
-  <div class="layout">
+  <div class="layout" data-mode="advanced">
     <aside class="sidebar">
       {nav_html}
     </aside>
@@ -1789,15 +1959,25 @@ def _render_dashboard(
       <header id="dashboard">
         <div>
           <div class="brand">FastMDXplora Results</div>
-          <h1>Dashboard</h1>
-          <div class="subtle">{escape(title)}</div>
-          <div class="breadcrumb">Project / Results / Dashboard</div>
+          <h1>{escape(title)}</h1>
           <div class="subtle">System: {escape(system or "not available")}</div>
         </div>
-        <div class="status">
-          <span class="dot {escape(status)}"></span>{escape(status.title())} -
-          Last generated {escape(generated)}
-          <button class="reset-layout" type="button" data-reset-layout>Reset layout</button>
+        <div class="header-controls">
+          <div class="mode-toggle" role="group" aria-label="Detail level">
+            <span class="mode-toggle-label">View</span>
+            <div class="mode-segments">
+              <span class="mode-thumb" aria-hidden="true"></span>
+              <button type="button" class="mode-segment" data-mode-set="basic"
+                aria-pressed="false">Basic</button>
+              <button type="button" class="mode-segment" data-mode-set="advanced"
+                aria-pressed="true">Advanced</button>
+            </div>
+          </div>
+          <div class="status">
+            <span class="dot {escape(status)}"></span>{escape(status.title())} -
+            Last generated {escape(generated)}
+            <button class="reset-layout" type="button" data-reset-layout>Reset layout</button>
+          </div>
         </div>
       </header>
       {notice_html}
@@ -1946,6 +2126,26 @@ def _render_dashboard(
       }}
     }})();
   </script>
+  <script>
+    (() => {{
+      const layout = document.querySelector(".layout");
+      if (!layout) return;
+      const buttons = document.querySelectorAll("[data-mode-set]");
+      const setMode = (mode) => {{
+        layout.dataset.mode = mode === "basic" ? "basic" : "advanced";
+        for (const button of buttons) {{
+          button.setAttribute(
+            "aria-pressed",
+            String(button.dataset.modeSet === layout.dataset.mode)
+          );
+        }}
+      }};
+      for (const button of buttons) {{
+        button.addEventListener("click", () => setMode(button.dataset.modeSet));
+      }}
+      setMode(layout.dataset.mode || "advanced");
+    }})();
+  </script>
 </body>
 </html>
 """
@@ -1956,13 +2156,24 @@ def _render_card(card: DashboardCard) -> str:
     classes = f"card {card.kind}"
     if card.label == "Project status":
         classes += " status-card"
+    if card.label == "Output folder":
+        classes += " card-path"
+    title_attr = f' title="{escape(card.title)}"' if card.title else ""
     return (
         f'<article class="{escape(classes)}">'
         f'<div class="label">{escape(card.label)}</div>'
-        f'<div class="value">{escape(card.value)}</div>'
+        f'<div class="value"{title_attr}>{escape(card.value)}</div>'
         f"{detail}"
         "</article>"
     )
+
+
+def _compact_output_path(path: str, *, keep_tail: int = 3) -> str:
+    """Shorten a long path for card display: first segment + last few."""
+    parts = [p for p in path.replace("\\", "/").split("/") if p]
+    if len(parts) <= keep_tail + 1:
+        return path
+    return f"{parts[0]}/…/" + "/".join(parts[-keep_tail:])
 
 
 def _render_section(section: DashboardSection) -> str:
@@ -2108,7 +2319,7 @@ def _render_sidebar(sections: list[DashboardSection], links: list[DashboardLink]
     report_links = {link.label: link.href for link in links}
     parts = [
         '<div class="logo">',
-        '<div class="mark">FX</div>',
+        f'<img class="mark" alt="AAI Research Lab" src="{AAI_LOGO_DATA_URI}">',
         '<div><div class="logo-title">FastMDXplora</div>',
         '<div class="logo-subtitle">Explore. Analyze. Visualize. Share.</div></div>',
         '</div>',
@@ -2124,7 +2335,8 @@ def _render_sidebar(sections: list[DashboardSection], links: list[DashboardLink]
     for label in SECTION_ORDER:
         href = analysis_links.get(label)
         if href:
-            parts.append(_nav_link(href, label, "", "-"))
+            nav_class = "" if label == "Core Metrics" else "nav-advanced"
+            parts.append(_nav_link(href, label, nav_class, "-"))
     parts.extend(
         [
             '</div>',
