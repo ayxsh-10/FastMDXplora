@@ -555,28 +555,50 @@ def _dashboard_shell(root: Path) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FastMDXplora Live Dashboard</title>
   <style>
-    :root {{ color-scheme: dark; --bg:#07101b; --panel:#101a28; --line:#22364b; --text:#edf4fb; --muted:#a7b5c6; --accent:#39b7c9; --ok:#7cc66a; --warn:#efb35e; --bad:#e35d6a; }}
+    @font-face {{ font-family:"Bricolage Grotesque"; font-style:normal; font-weight:200 800; font-display:swap; src:url("/static/bricolage.woff2") format("woff2"); }}
+    @font-face {{ font-family:"Hanken Grotesk"; font-style:normal; font-weight:100 900; font-display:swap; src:url("/static/hanken.woff2") format("woff2"); }}
+    :root {{
+      color-scheme: light dark;
+      --bg:#f7f8fa; --sidebar:#ffffff; --panel:#ffffff; --panel-frame:#f8f9fb; --line:#ececf1; --line-soft:#f0f1f4;
+      --text:#1a1c22; --muted:#6a6f7a; --faint:#9aa0ab; --accent:#5a57d6; --accent-ink:#4a47c4;
+      --ok:#2f9e64; --warn:#bd8420; --bad:#d14343;
+      --shadow:rgba(20,22,40,.06); --pill-bg:rgba(90,87,214,.10); --pill-border:rgba(90,87,214,.22);
+      --sans:"Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --display:"Bricolage Grotesque", "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono:ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    }}
+    @media (prefers-color-scheme: dark) {{
+      :root {{
+        --bg:#0e0f13; --sidebar:#16181e; --panel:#16181e; --panel-frame:#12141a; --line:#24262f; --line-soft:#20222a;
+        --text:#eceef2; --muted:#9ba1ad; --faint:#6b7280; --accent:#8c88f5; --accent-ink:#a6a3ff;
+        --ok:#46b87c; --warn:#d8a23f; --bad:#e06b6b;
+        --shadow:rgba(0,0,0,.4); --pill-bg:rgba(140,136,245,.15); --pill-border:rgba(140,136,245,.30);
+      }}
+    }}
     * {{ box-sizing: border-box; }}
-    body {{ margin:0; background:var(--bg); color:var(--text); font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+    body {{ margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); -webkit-font-smoothing:antialiased; }}
     .layout {{ display:grid; grid-template-columns:260px minmax(0,1fr); min-height:100vh; }}
-    aside {{ border-right:1px solid var(--line); background:#071321; padding:22px 16px; }}
+    aside {{ border-right:1px solid var(--line); background:var(--sidebar); padding:22px 16px; }}
     main {{ padding:24px; width:min(1480px, 100%); }}
-    .brand {{ font-weight:800; font-size:1.1rem; margin-bottom:4px; }}
+    .brand-row {{ display:grid; grid-template-columns:40px 1fr; gap:11px; align-items:center; margin-bottom:6px; }}
+    .brand-logo {{ width:40px; height:40px; border-radius:11px; object-fit:cover; box-shadow:0 1px 2px var(--shadow); }}
+    .brand {{ font-family:var(--display); font-weight:650; font-size:1rem; letter-spacing:-.01em; }}
     .subtle, .muted {{ color:var(--muted); }}
-    .nav-heading {{ color:#7d8da2; font-size:.72rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; margin:20px 0 8px; }}
-    .nav-link {{ display:flex; gap:9px; align-items:center; padding:8px 10px; border-radius:8px; color:#d4deea; text-decoration:none; }}
-    .nav-link.active, .nav-link:hover {{ background:rgba(57,183,201,.14); color:white; }}
+    .nav-heading {{ color:var(--faint); font-size:.7rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin:20px 0 8px; }}
+    .nav-link {{ display:flex; gap:9px; align-items:center; padding:8px 10px; border-radius:8px; color:var(--text); text-decoration:none; }}
+    .nav-link.active, .nav-link:hover {{ background:var(--pill-bg); color:var(--accent-ink); }}
     .view {{ display:none; }}
     .view.active {{ display:block; }}
     .header {{ display:flex; justify-content:space-between; gap:18px; align-items:flex-end; border-bottom:1px solid var(--line); padding-bottom:18px; margin-bottom:22px; }}
-    h1 {{ margin:0 0 6px; font-size:2rem; letter-spacing:0; }}
-    .badge {{ display:inline-flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.04); }}
+    h1 {{ margin:0 0 6px; font-family:var(--display); font-size:1.6rem; font-weight:650; letter-spacing:-.02em; }}
+    h2 {{ font-family:var(--display); font-weight:600; letter-spacing:-.01em; }}
+    .badge {{ display:inline-flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--line); border-radius:999px; background:var(--panel-frame); }}
     .dot {{ width:9px; height:9px; border-radius:99px; background:var(--warn); }}
     .dot.ok {{ background:var(--ok); }} .dot.warning {{ background:var(--warn); }} .dot.failed {{ background:var(--bad); }}
     .cards {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:18px; }}
-    .card, .panel {{ border:1px solid var(--line); border-radius:8px; background:linear-gradient(180deg,rgba(19,35,56,.92),rgba(16,27,41,.96)); padding:16px; }}
-    .card .label {{ color:var(--muted); font-size:.82rem; margin-bottom:8px; }} .card .value {{ font-size:1.25rem; font-weight:760; overflow-wrap:anywhere; }}
-    .progress-track {{ height:13px; border-radius:99px; background:#0b1626; border:1px solid rgba(148,163,184,.2); overflow:hidden; }}
+    .card, .panel {{ border:1px solid var(--line); border-radius:14px; background:var(--panel); box-shadow:0 1px 2px var(--shadow); padding:16px; }}
+    .card .label {{ color:var(--faint); font-size:.72rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-bottom:8px; }} .card .value {{ font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:1.2rem; font-weight:550; overflow-wrap:anywhere; }}
+    .progress-track {{ height:13px; border-radius:99px; background:var(--panel-frame); border:1px solid var(--line); overflow:hidden; }}
     .progress-fill {{ height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--ok)); transition:width .3s ease; }}
     .grid {{ display:grid; grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr); gap:14px; align-items:start; }}
     .live-grid {{
@@ -593,11 +615,11 @@ def _dashboard_shell(root: Path) -> str:
       align-items:start;
       margin-top:14px;
     }}
-    canvas {{ width:100%; height:230px; background:#0b1626; border:1px solid rgba(148,163,184,.18); border-radius:8px; }}
+    canvas {{ width:100%; height:230px; background:var(--panel-frame); border:1px solid var(--line); border-radius:8px; }}
     .events {{ max-height:320px; overflow:auto; display:grid; gap:8px; }}
-    .event {{ padding:8px 10px; border:1px solid rgba(148,163,184,.16); border-radius:7px; background:#0b1626; }}
+    .event {{ padding:8px 10px; border:1px solid var(--line); border-radius:7px; background:var(--panel-frame); }}
     .artifact-list {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; }}
-    .artifact {{ color:inherit; text-decoration:none; border:1px solid var(--line); border-radius:8px; padding:10px; background:#0b1626; min-width:0; max-width:100%; overflow:hidden; display:grid; gap:3px; }}
+    .artifact {{ color:inherit; text-decoration:none; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--panel-frame); min-width:0; max-width:100%; overflow:hidden; display:grid; gap:3px; }}
     .artifact-title, .artifact-subtitle, .artifact-path, .plot-meta, .plot-path, .card-subtitle {{
       min-width:0;
       max-width:100%;
@@ -614,11 +636,11 @@ def _dashboard_shell(root: Path) -> str:
       overflow:hidden;
     }}
     .toolbar {{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }}
-    .button {{ border:1px solid rgba(148,163,184,.28); border-radius:7px; background:#0b1626; color:var(--text); padding:8px 11px; cursor:pointer; }}
-    .button:hover {{ border-color:rgba(57,183,201,.7); background:rgba(57,183,201,.14); }}
+    .button {{ border:1px solid var(--line); border-radius:7px; background:var(--panel-frame); color:var(--text); padding:8px 11px; cursor:pointer; }}
+    .button:hover {{ border-color:var(--pill-border); background:var(--pill-bg); }}
     .result-state {{ margin-bottom:14px; }}
     .plot-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }}
-    .plot-card {{ border:1px solid var(--line); border-radius:8px; padding:12px; background:#0b1626; min-width:0; max-width:100%; overflow:hidden; display:flex; flex-direction:column; gap:10px; }}
+    .plot-card {{ border:1px solid var(--line); border-radius:8px; padding:12px; background:var(--panel-frame); min-width:0; max-width:100%; overflow:hidden; display:flex; flex-direction:column; gap:10px; }}
     .plot-card.card-sm {{ grid-column:span 1; }}
     .plot-card.card-md {{ grid-column:span 1; }}
     .plot-card.card-lg {{ grid-column:span 2; }}
@@ -626,15 +648,15 @@ def _dashboard_shell(root: Path) -> str:
     .plot-card h3, .plot-title {{ margin:0 0 8px; font-size:1rem; overflow-wrap:anywhere; line-height:1.15; }}
     .plot-title-row {{ display:flex; gap:8px; justify-content:space-between; align-items:flex-start; }}
     .size-controls {{ display:flex; gap:4px; flex-wrap:wrap; }}
-    .size-button {{ border:1px solid rgba(148,163,184,.25); background:#071321; color:var(--muted); border-radius:5px; padding:2px 5px; font-size:.68rem; cursor:pointer; }}
-    .size-button:hover, .size-button.active {{ color:white; border-color:rgba(57,183,201,.7); }}
-    .plot-frame {{ height:210px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(148,163,184,.16); border-radius:8px; background:#071321; overflow:hidden; }}
+    .size-button {{ border:1px solid var(--line); background:var(--panel-frame); color:var(--muted); border-radius:5px; padding:2px 5px; font-size:.68rem; cursor:pointer; }}
+    .size-button:hover, .size-button.active {{ color:white; border-color:var(--pill-border); }}
+    .plot-frame {{ height:210px; display:flex; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:8px; background:var(--panel-frame); overflow:hidden; }}
     .plot-card.card-lg .plot-frame {{ height:390px; }}
     .plot-card.card-wide .plot-frame {{ height:260px; }}
     .plot-frame img {{ width:100%; height:100%; object-fit:contain; display:block; }}
     .preview-toolbar {{ display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-top:10px; }}
-    .preview-button {{ border:1px solid rgba(148,163,184,.28); border-radius:7px; background:#0b1626; color:var(--text); padding:6px 9px; cursor:pointer; font-size:.84rem; }}
-    .preview-button:hover, .preview-button.active {{ border-color:rgba(57,183,201,.7); background:rgba(57,183,201,.14); }}
+    .preview-button {{ border:1px solid var(--line); border-radius:7px; background:var(--panel-frame); color:var(--text); padding:6px 9px; cursor:pointer; font-size:.84rem; }}
+    .preview-button:hover, .preview-button.active {{ border-color:var(--pill-border); background:var(--pill-bg); }}
     .preview-button:disabled {{ opacity:.45; cursor:not-allowed; }}
     .preview-note {{ margin-top:8px; color:var(--muted); font-size:.86rem; }}
     .protein-preview-card .plot-title-row,
@@ -657,9 +679,9 @@ def _dashboard_shell(root: Path) -> str:
       align-items:center;
       justify-content:center;
       overflow:hidden;
-      border:1px solid rgba(148,163,184,.16);
+      border:1px solid var(--line);
       border-radius:8px;
-      background:#071321;
+      background:var(--panel-frame);
       margin-top:12px;
     }}
     .protein-preview-frame img {{
@@ -716,9 +738,9 @@ def _dashboard_shell(root: Path) -> str:
       display:none;
     }}
     .phase-list {{ display:grid; gap:10px; }}
-    .phase-row {{ display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; padding:10px 12px; border:1px solid rgba(148,163,184,.16); border-radius:8px; background:#0b1626; }}
+    .phase-row {{ display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel-frame); }}
     .table {{ display:grid; gap:8px; }}
-    .table-row {{ display:grid; grid-template-columns:minmax(130px,.35fr) minmax(0,1fr); gap:12px; padding:9px 0; border-bottom:1px solid rgba(148,163,184,.12); }}
+    .table-row {{ display:grid; grid-template-columns:minmax(130px,.35fr) minmax(0,1fr); gap:12px; padding:9px 0; border-bottom:1px solid var(--line-soft); }}
     .category-heading {{ margin:18px 0 10px; color:var(--muted); font-size:.82rem; text-transform:uppercase; letter-spacing:.06em; }}
     .quick-links {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }}
     .config-form {{ display:grid; gap:16px; max-width:1100px; }}
@@ -777,17 +799,12 @@ def _dashboard_shell(root: Path) -> str:
 <body>
 <div class="layout">
   <aside>
-<<<<<<< HEAD
     <div class="brand-row">
-      <img class="brand-logo" alt="AAI Research Lab" src="{AAI_LOGO_DATA_URI}">
+      <img class="brand-logo" alt="AAI Research Lab" src="/static/aai_logo.png">
       <div><div class="brand">FastMDXplora</div><div class="subtle" style="font-size:.72rem">Live dashboard</div></div>
     </div>
     <div class="nav-heading">Setup</div>
     <a href="#configure" class="nav-link" data-view-link="configure">Configure &amp; Run</a>
-=======
-    <div class="brand">FastMDXplora</div>
-    <div class="subtle">Local live dashboard</div>
->>>>>>> parent of c58e6b3 (Restyle live dashboard to match the report's Fastfold look)
     <div class="nav-heading">Overview</div>
     <a href="#dashboard" class="nav-link active" data-view-link="dashboard">Dashboard</a>
     <a href="#live" class="nav-link" data-view-link="live">Live Simulation</a>
@@ -958,7 +975,7 @@ function drawChart(metrics) {{
   if (!series.length) {{ document.getElementById("chart-empty").style.display = "block"; return; }}
   const all = series.flatMap(s => s.values);
   const min = Math.min(...all), max = Math.max(...all), span = max === min ? 1 : max - min;
-  ctx.strokeStyle = "rgba(148,163,184,.25)"; ctx.lineWidth = 1;
+  ctx.strokeStyle = "var(--line)"; ctx.lineWidth = 1;
   for (let y=30; y<canvas.height-25; y+=45) {{ ctx.beginPath(); ctx.moveTo(42,y); ctx.lineTo(canvas.width-16,y); ctx.stroke(); }}
   for (const s of series) {{
     ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.beginPath();
